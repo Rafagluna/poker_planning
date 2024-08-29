@@ -11,11 +11,13 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 class PokerServer implements MessageComponentInterface
 {
     protected $clients;
+    protected $votes;
 
     public function __construct()
     {
         // $this->clients = new \SplObjectStorage;
         $this->clients = [];
+        $this->votes = []; 
     }
 
     // public function onOpen(ConnectionInterface $conn)
@@ -51,6 +53,26 @@ class PokerServer implements MessageComponentInterface
         }
     }
 
+    // public function onOpen(ConnectionInterface $conn)
+    // {
+    //     // Gerar identificador único para o usuário
+    //     $userId = uniqid('user_', true);
+
+    //     // Armazenar a conexão e o identificador
+    //     $this->clients[$conn->resourceId] = ['connection' => $conn, 'userId' => $userId, 'name' => ''];
+
+    //     // Enviar a mensagem para o novo cliente com os usuários existentes
+    //     foreach ($this->clients as $client) {
+    //         if ($client['userId'] !== $userId) {
+    //             $conn->send(json_encode([
+    //                 'type' => 'new_user',
+    //                 'userId' => $client['userId'],
+    //                 'name' => $client['name']
+    //             ]));
+    //         }
+    //     }
+    // }
+
     // public function onMessage(ConnectionInterface $from, $msg)
     // {
     //     foreach ($this->clients as $client) {
@@ -65,23 +87,103 @@ class PokerServer implements MessageComponentInterface
     //     // Processamento de mensagens se necessário
     // }
 
+    // public function onMessage(ConnectionInterface $from, $msg)
+    // {
+    //     $messageData = json_decode($msg, true);
+
+    //     if ($messageData['type'] === 'set_name') {
+    //         $this->clients[$from->resourceId]['name'] = $messageData['name'];
+
+    //         // Notificar todos os clientes sobre o novo usuário com o nome
+    //         foreach ($this->clients as $client) {
+    //             $client['connection']->send(json_encode([
+    //                 'type' => 'new_user',
+    //                 'userId' => $this->clients[$from->resourceId]['userId'],
+    //                 'name' => $messageData['name']
+    //             ]));
+    //         }
+    //     }
+    // }
+
+    // public function onMessage(ConnectionInterface $from, $msg)
+    // {
+    //     $messageData = json_decode($msg, true);
+
+    //     if ($messageData['type'] === 'set_name') {
+    //         $this->clients[$from->resourceId]['name'] = $messageData['name'];
+
+    //         foreach ($this->clients as $client) {
+    //             $client['connection']->send(json_encode([
+    //                 'type' => 'new_user',
+    //                 'userId' => $this->clients[$from->resourceId]['userId'],
+    //                 'name' => $messageData['name']
+    //             ]));
+    //         }
+    //     } elseif ($messageData['type'] === 'vote') {
+    //         $card = $messageData['card'];
+    //         if (!isset($this->votes[$card])) {
+    //             $this->votes[$card] = 0;
+    //         }
+    //         $this->votes[$card] += 1;
+    //     } elseif ($messageData['type'] === 'reveal_votes') {
+    //         $result = [];
+    //         foreach ($this->votes as $card => $count) {
+    //             $result[] = ['card' => $card, 'count' => $count];
+    //         }
+
+    //         foreach ($this->clients as $client) {
+    //             $client['connection']->send(json_encode([
+    //                 'type' => 'vote_result',
+    //                 'votes' => $result
+    //             ]));
+    //         }
+    //     }
+    // }
+
     public function onMessage(ConnectionInterface $from, $msg)
     {
         $messageData = json_decode($msg, true);
 
-        if ($messageData['type'] === 'set_name') {
-            $this->clients[$from->resourceId]['name'] = $messageData['name'];
+        switch ($messageData['type']) {
+            case 'set_name':
+                $this->clients[$from->resourceId]['name'] = $messageData['name'];
+                $userId = $this->clients[$from->resourceId]['userId'];
 
-            // Notificar todos os clientes sobre o novo usuário com o nome
-            foreach ($this->clients as $client) {
-                $client['connection']->send(json_encode([
-                    'type' => 'new_user',
-                    'userId' => $this->clients[$from->resourceId]['userId'],
-                    'name' => $messageData['name']
-                ]));
-            }
+                // Notificar todos os clientes sobre o novo usuário com o nome
+                foreach ($this->clients as $client) {
+                    $client['connection']->send(json_encode([
+                        'type' => 'new_user',
+                        'userId' => $userId,
+                        'name' => $messageData['name']
+                    ]));
+                }
+                break;
+
+            case 'vote':
+                $card = $messageData['card'];
+                if (!isset($this->votes[$card])) {
+                    $this->votes[$card] = 0;
+                }
+                $this->votes[$card] += 1;
+                break;
+
+            case 'reveal_votes':
+                $result = [];
+                foreach ($this->votes as $card => $count) {
+                    $result[] = ['card' => $card, 'count' => $count];
+                }
+
+                // Enviar os resultados para todos os clientes
+                foreach ($this->clients as $client) {
+                    $client['connection']->send(json_encode([
+                        'type' => 'vote_result',
+                        'votes' => $result
+                    ]));
+                }
+                break;
         }
     }
+
 
     // public function onClose(ConnectionInterface $conn)
     // {
